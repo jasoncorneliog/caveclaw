@@ -126,6 +126,10 @@ async def run_discord(config: Config) -> None:
             return
 
         agent_name = _resolve_agent(channel_id, config)
+        # Cancel any existing typing task for this channel before starting a new one
+        existing = typing_tasks.pop(channel_id, None)
+        if existing:
+            existing.cancel()
         # Start continuous typing indicator until the reply is sent
         typing_tasks[channel_id] = asyncio.create_task(
             _keep_typing(message.channel)
