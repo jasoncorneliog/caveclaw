@@ -53,6 +53,12 @@ async def handle_message(
     sessions_dir = workspace / "sessions"
     system_prompt = _build_system_prompt(workspace)
 
+    # Load conversation history before appending the new message
+    history = session.get_history(message.chat_id, limit=50, sessions_dir=sessions_dir)
+    if history:
+        lines = [f"{'User' if h['role'] == 'user' else 'Assistant'}: {h['content']}" for h in history]
+        system_prompt += "\n\n## Conversation History\n\n" + "\n\n".join(lines)
+
     # Persist the user message
     session.append(message.chat_id, "user", message.content, sessions_dir=sessions_dir)
 
