@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "caveclaw"
+version = "0.1.0"
+description = "An AI agent that lives in your cave and gets things done through chat."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.13"
+dependencies = [
+    "claude-agent-sdk>=0.1.40",
+    "typer>=0.24.1",
+    "pydantic>=2.12.5",
+    "rich>=14.3.3",
+    "prompt-toolkit>=3.0.52",
+    "discord.py>=2.6.4",
+]
+
+[project.scripts]
+caveclaw = "caveclaw.cli:app"
