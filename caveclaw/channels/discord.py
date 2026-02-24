@@ -47,13 +47,29 @@ def _resolve_agent(channel_id: str, config: Config) -> str:
     return config.discord_routing.get(channel_id, config.default_agent)
 
 
+async def _keep_typing(channel: discord.abc.Messageable) -> None:
+    """Hold a typing indicator until cancelled."""
+    try:
+        async with channel.typing():
+            await asyncio.sleep(3600)  # cancelled externally
+    except asyncio.CancelledError:
+        pass
+    except Exception as e:
+        print(f"Typing indicator error: {e}")
+
+
 async def _outbound_sender(
     bus: MessageBus,
     bot: discord.Client,
+    typing_tasks: dict[str, asyncio.Task[None]],
 ) -> None:
     """Consume outbound messages and send them to Discord."""
     while True:
         msg: OutboundMessage = await bus.consume_outbound()
+        # Stop typing indicator for this channel
+        task = typing_tasks.pop(msg.chat_id, None)
+        if task:
+            task.cancel()
         channel = bot.get_channel(int(msg.chat_id))
         if channel is None:
             continue
@@ -73,6 +89,8 @@ async def run_discord(config: Config) -> None:
     @bot.event
     async def on_ready() -> None:
         print(f"Discord bot connected as {bot.user}")
+
+    typing_tasks: dict[str, asyncio.Task[None]] = {}
 
     @bot.event
     async def on_message(message: discord.Message) -> None:
@@ -108,7 +126,10 @@ async def run_discord(config: Config) -> None:
             return
 
         agent_name = _resolve_agent(channel_id, config)
-        await message.channel.trigger_typing()
+        # Start continuous typing indicator until the reply is sent
+        typing_tasks[channel_id] = asyncio.create_task(
+            _keep_typing(message.channel)
+        )
 
         await bus.publish_inbound(
             InboundMessage(
@@ -124,5 +145,5 @@ async def run_discord(config: Config) -> None:
         await asyncio.gather(
             bot.start(config.discord_token),
             agent_loop(config, bus),
-            _outbound_sender(bus, bot),
+            _outbound_sender(bus, bot, typing_tasks),
         )
