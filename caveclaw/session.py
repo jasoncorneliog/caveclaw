@@ -19,10 +19,18 @@ def get_or_create(key: str, sessions_dir: Path) -> Path:
     return path
 
 
-def append(key: str, role: str, content: str, sessions_dir: Path) -> None:
+def append(
+    key: str,
+    role: str,
+    content: str,
+    sessions_dir: Path,
+    attachments: list[dict] | None = None,
+) -> None:
     """Append a message to the session log."""
     path = get_or_create(key, sessions_dir)
-    entry = {"ts": time.time(), "role": role, "content": content}
+    entry: dict = {"ts": time.time(), "role": role, "content": content}
+    if attachments:
+        entry["attachments"] = attachments
     with path.open("a") as f:
         f.write(json.dumps(entry) + "\n")
 
