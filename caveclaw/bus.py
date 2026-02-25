@@ -7,12 +7,22 @@ from dataclasses import dataclass, field
 
 
 @dataclass
+class Attachment:
+    """A file attachment downloaded to local disk."""
+    path: str
+    filename: str
+    content_type: str
+    size: int
+
+
+@dataclass
 class InboundMessage:
     channel: str
     sender_id: str
     chat_id: str
     content: str
     agent_name: str = "claw"
+    attachments: list[Attachment] = field(default_factory=list)
 
 
 @dataclass

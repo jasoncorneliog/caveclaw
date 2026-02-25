@@ -30,6 +30,7 @@ class Config(BaseModel):
     default_agent: str = "claw"
     agents: dict[str, AgentConfig] = Field(default_factory=dict)
     discord_routing: dict[str, str] = Field(default_factory=dict)
+    max_attachment_bytes: int = 10 * 1024 * 1024  # 10 MB
 
 
 def agent_dir(name: str) -> Path:

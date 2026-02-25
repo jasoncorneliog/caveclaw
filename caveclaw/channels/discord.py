@@ -3,15 +3,20 @@
 from __future__ import annotations
 
 import asyncio
+import time as _time
+import uuid
+from pathlib import Path
 
 import discord
 
 from caveclaw.agent import agent_loop
-from caveclaw.bus import InboundMessage, MessageBus, OutboundMessage
-from caveclaw.config import Config, TEMPLATES_DIR
+from caveclaw.bus import Attachment, InboundMessage, MessageBus, OutboundMessage
+from caveclaw.config import AGENTS_DIR, Config, TEMPLATES_DIR, agent_dir
 from caveclaw.db import get_state, set_state
 
 MAX_DISCORD_LEN = 2000
+ALLOWED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp", "image/gif"}
+MAX_ATTACHMENT_AGE_SECONDS = 7 * 24 * 3600  # 7 days
 
 
 def _split_message(text: str) -> list[str]:
@@ -47,6 +52,55 @@ def _resolve_agent(channel_id: str, config: Config) -> str:
     return config.discord_routing.get(channel_id, config.default_agent)
 
 
+async def _download_attachments(
+    discord_attachments: list[discord.Attachment],
+    agent_name: str,
+    max_size: int,
+) -> list[Attachment]:
+    """Download valid image attachments to the agent's workspace."""
+    results: list[Attachment] = []
+    workspace = agent_dir(agent_name)
+    attachments_dir = workspace / "attachments"
+    attachments_dir.mkdir(parents=True, exist_ok=True)
+
+    for att in discord_attachments:
+        content_type = (att.content_type or "").split(";")[0].strip()
+        if content_type not in ALLOWED_IMAGE_TYPES:
+            continue
+        if att.size > max_size:
+            continue
+
+        local_name = f"{uuid.uuid4().hex[:12]}_{att.filename}"
+        local_path = attachments_dir / local_name
+
+        try:
+            await att.save(local_path)
+            results.append(Attachment(
+                path=str(local_path),
+                filename=att.filename,
+                content_type=content_type,
+                size=att.size,
+            ))
+        except Exception as e:
+            print(f"Failed to download attachment {att.filename}: {e}")
+
+    return results
+
+
+def _cleanup_attachments(workspace: Path) -> int:
+    """Remove attachments older than MAX_ATTACHMENT_AGE_SECONDS."""
+    attachments_dir = workspace / "attachments"
+    if not attachments_dir.is_dir():
+        return 0
+    cutoff = _time.time() - MAX_ATTACHMENT_AGE_SECONDS
+    removed = 0
+    for f in attachments_dir.iterdir():
+        if f.is_file() and f.stat().st_mtime < cutoff:
+            f.unlink()
+            removed += 1
+    return removed
+
+
 async def _keep_typing(channel: discord.abc.Messageable) -> None:
     """Hold a typing indicator until cancelled."""
     try:
@@ -79,6 +133,12 @@ async def _outbound_sender(
 
 async def run_discord(config: Config) -> None:
     """Start the Discord bot and agent loop."""
+    # Clean up old attachments at startup
+    if AGENTS_DIR.is_dir():
+        for d in AGENTS_DIR.iterdir():
+            if d.is_dir():
+                _cleanup_attachments(d)
+
     intents = discord.Intents.default()
     intents.message_content = True
     bot = discord.Client(intents=intents)
@@ -126,6 +186,18 @@ async def run_discord(config: Config) -> None:
             return
 
         agent_name = _resolve_agent(channel_id, config)
+
+        # Download image attachments to the agent workspace
+        attachments: list[Attachment] = []
+        if message.attachments:
+            attachments = await _download_attachments(
+                message.attachments, agent_name, config.max_attachment_bytes,
+            )
+
+        # Skip if no text and no usable attachments
+        if not content and not attachments:
+            return
+
         # Cancel any existing typing task for this channel before starting a new one
         existing = typing_tasks.pop(channel_id, None)
         if existing:
@@ -142,6 +214,7 @@ async def run_discord(config: Config) -> None:
                 chat_id=channel_id,
                 content=content,
                 agent_name=agent_name,
+                attachments=attachments,
             )
         )
 
