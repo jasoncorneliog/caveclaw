@@ -71,6 +71,7 @@ Auto-created on first run. No onboarding needed.
 - **Memory isolation:** `memory.py` takes `workspace: Path` — each agent gets its own MEMORY.md and HISTORY.md.
 - **Auth:** `CLAUDE_CODE_OAUTH_TOKEN` env var (from `claude setup-token`). Never stored in config.
 - **Env var overrides:** `DISCORD_TOKEN` env var overrides `discord_token` in config.json. Allows centralizing all secrets in `~/.caveclaw/.env`.
+- **`CAVECLAW_DIR` env var:** Overrides the default `~/.caveclaw` data directory. Used in Docker to point the app at `/data` (the volume mount target), avoiding home directory permission issues. Falls back to `~/.caveclaw` when unset.
 
 ### Claude Agent SDK Usage
 
@@ -96,14 +97,16 @@ caveclaw gateway                 # run Discord bot
 
 ```bash
 docker build -t caveclaw .
-docker run -it -e CLAUDE_CODE_OAUTH_TOKEN=... \
-  -v ~/.caveclaw:/home/caveclaw/.caveclaw caveclaw agent
+docker run -it -e CLAUDE_CODE_OAUTH_TOKEN=... -e CAVECLAW_DIR=/data \
+  -v ~/.caveclaw:/data caveclaw agent
 ```
 
 ### Production Deployment
 
 ```bash
 # Deploy using docker compose (reads secrets from ~/.caveclaw/.env)
+# UID/GID must be exported so the container runs as the host user
+export DOCKER_UID=$(id -u) DOCKER_GID=$(id -g)
 docker compose -f docker-compose.prod.yml up -d
 
 # View logs
@@ -130,7 +133,8 @@ When a mistake is made during development, add a concise entry here so it is not
 - **Config paths must be portable:** Never write fully resolved absolute paths into config files. Store with `~`, resolve with `expanduser()` at load time.
 - **Claude Agent SDK `permission_mode` values:** Valid values are `acceptEdits`, `bypassPermissions`, `default`, `dontAsk`, `plan`. There is no `auto` mode.
 - **`bypassPermissions` cannot run as root:** The Agent SDK refuses `--dangerously-skip-permissions` as root. Always use a non-root user in Docker (`useradd -m caveclaw` + `USER caveclaw`).
-- **Docker volume mount must match container user's home:** Container user `caveclaw` has home `/home/caveclaw`. Mount to `/home/caveclaw/.caveclaw`, not `/root/.caveclaw`.
+- **Docker volume mounts use `/data`, not home directory:** Mount `~/.caveclaw` to `/data` and set `CAVECLAW_DIR=/data`. Don't mount to `/home/caveclaw/.caveclaw` — causes permission issues when the container UID differs from the image's `caveclaw` user.
+- **Docker UID override:** `docker-compose.prod.yml` uses `user: "${DOCKER_UID}:${DOCKER_GID}"` so the container process matches the host user's UID. Export these before running `docker compose`. Note: `UID` is a readonly bash variable — use `DOCKER_UID` instead.
 - **`pyproject.toml` `readme` field requires the file in Docker context:** `COPY` must include `README.md` or pip fails with "Readme file does not exist".
 - **`python:3.14-slim` (Trixie) apt issue:** `docker-clean` config breaks `apt-get update` on Docker Engine < 29. Use Docker 29+ or `python:3.13-slim-bookworm`.
 - **Nanobot is not a Claude Agent SDK project:** It has its own agent loop. Don't reference it for SDK patterns.
