@@ -102,3 +102,19 @@ def test_load_config_defaults_when_missing(monkeypatch, tmp_path):
     monkeypatch.setattr(config_mod, "CONFIG_PATH", tmp_path / "nonexistent.json")
     c = config_mod.load_config()
     assert c.model == "claude-sonnet-4-6"
+
+
+def test_load_config_discord_token_from_env(monkeypatch, tmp_path):
+    monkeypatch.setattr(config_mod, "CONFIG_PATH", tmp_path / "nonexistent.json")
+    monkeypatch.setenv("DISCORD_TOKEN", "env-token-123")
+    c = config_mod.load_config()
+    assert c.discord_token == "env-token-123"
+
+
+def test_load_config_env_overrides_file(monkeypatch, tmp_path):
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps({"discord_token": "file-token"}))
+    monkeypatch.setattr(config_mod, "CONFIG_PATH", cfg_path)
+    monkeypatch.setenv("DISCORD_TOKEN", "env-token-wins")
+    c = config_mod.load_config()
+    assert c.discord_token == "env-token-wins"

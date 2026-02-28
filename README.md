@@ -71,6 +71,42 @@ docker run -d --restart unless-stopped \
   -v ~/.caveclaw:/home/caveclaw/.caveclaw caveclaw gateway
 ```
 
+## CI/CD
+
+GitHub Actions pipeline with a self-hosted runner:
+
+- **PR Check** (`pr-check.yml`): Runs tests on every pull request to `main`
+- **CI/CD** (`ci-cd.yml`): On push to `main` — runs tests, builds Docker image, pushes to GHCR (`ghcr.io/jasoncorneliog/caveclaw`)
+- **Deploy** (`deploy.yml`): Manual trigger — pulls latest image and deploys via `docker compose`
+
+### Production Deployment
+
+```bash
+# On the server, secrets live in a single .env file
+cat ~/.caveclaw/.env
+CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-...
+DISCORD_TOKEN=MTIz...
+
+# Deploy manually (or trigger via GitHub Actions UI)
+docker compose -f docker-compose.prod.yml up -d
+```
+
+### Self-Hosted Runner Setup
+
+1. Install Docker + `docker-compose-plugin` on your Ubuntu server
+2. Create a runner user: `sudo useradd -m -s /bin/bash github-runner && sudo usermod -aG docker github-runner`
+3. Install the GitHub Actions runner: repo **Settings > Actions > Runners > New self-hosted runner**, install as a systemd service
+4. Create the secrets file:
+   ```bash
+   mkdir -p ~/.caveclaw
+   cat > ~/.caveclaw/.env << 'EOF'
+   CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-...
+   DISCORD_TOKEN=MTIz...
+   EOF
+   chmod 600 ~/.caveclaw/.env
+   ```
+5. Optionally create `~/.caveclaw/config.json` for non-secret settings (`discord_allow_from`, `default_agent`, etc.)
+
 ## Agents
 
 Agents are defined declaratively in `agents/`:
@@ -145,7 +181,7 @@ Optional. Stored at `~/.caveclaw/config.json`. If absent, defaults are used.
 }
 ```
 
-- **`discord_token`**: Bot token from Developer Portal (never commit to git)
+- **`discord_token`**: Bot token from Developer Portal (never commit to git). Can also be set via `DISCORD_TOKEN` environment variable, which takes precedence over the config file.
 - **`discord_allow_from`**: Whitelist of numeric Discord user IDs. Only these users can interact with the bot. **Always set this.**
 - **`discord_routing`**: Optional static channel→agent mapping (overridden by `!agent` command)
 

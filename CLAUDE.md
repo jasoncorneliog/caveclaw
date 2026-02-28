@@ -16,6 +16,11 @@ Multi-agent system with CLI and Discord channels. Single message bus, single age
 caveclaw/                    # repo root
 ├── pyproject.toml           # Python >= 3.13, deps pinned to latest
 ├── Dockerfile               # python:3.14-slim + Node 22, non-root user
+├── docker-compose.prod.yml  # production deploy (caveclaw gateway)
+├── .github/workflows/       # CI/CD pipelines
+│   ├── ci-cd.yml            # test + build on push to main
+│   ├── deploy.yml           # manual deploy (workflow_dispatch)
+│   └── pr-check.yml         # test on PRs
 ├── agents/                  # declarative agent templates (auto-provisioned at runtime)
 │   ├── claw/
 │   │   ├── SOUL.md          # primary agent personality
@@ -42,6 +47,7 @@ Auto-created on first run. No onboarding needed.
 
 ```
 ~/.caveclaw/
+├── .env                     # secrets: CLAUDE_CODE_OAUTH_TOKEN, DISCORD_TOKEN
 ├── config.json              # optional — overrides for model, discord, routing
 ├── caveclaw.db              # shared SQLite
 └── agents/
@@ -64,6 +70,7 @@ Auto-created on first run. No onboarding needed.
 - **Session isolation:** Each agent stores sessions in its own `agents/<name>/sessions/` directory.
 - **Memory isolation:** `memory.py` takes `workspace: Path` — each agent gets its own MEMORY.md and HISTORY.md.
 - **Auth:** `CLAUDE_CODE_OAUTH_TOKEN` env var (from `claude setup-token`). Never stored in config.
+- **Env var overrides:** `DISCORD_TOKEN` env var overrides `discord_token` in config.json. Allows centralizing all secrets in `~/.caveclaw/.env`.
 
 ### Claude Agent SDK Usage
 
@@ -93,6 +100,28 @@ docker run -it -e CLAUDE_CODE_OAUTH_TOKEN=... \
   -v ~/.caveclaw:/home/caveclaw/.caveclaw caveclaw agent
 ```
 
+### Production Deployment
+
+```bash
+# Deploy using docker compose (reads secrets from ~/.caveclaw/.env)
+docker compose -f docker-compose.prod.yml up -d
+
+# View logs
+docker logs caveclaw-gateway --tail=100 -f
+
+# Manual deploy via GitHub Actions UI: Actions → Deploy → Run workflow
+```
+
+## CI/CD
+
+Three GitHub Actions workflows, all on a self-hosted runner:
+
+- **`ci-cd.yml`** — push to `main`: test → build Docker image → push to GHCR
+- **`deploy.yml`** — manual `workflow_dispatch`: pull image → `docker compose up` → health check
+- **`pr-check.yml`** — pull requests to `main`: run tests
+
+Images are pushed to `ghcr.io/jasoncorneliog/caveclaw` tagged with commit SHA and `latest`. GHCR auth uses the automatic `GITHUB_TOKEN`.
+
 ## Lessons Learned
 
 When a mistake is made during development, add a concise entry here so it is not repeated.
@@ -108,3 +137,4 @@ When a mistake is made during development, add a concise entry here so it is not
 - **`TEMPLATES_DIR` must work after pip install:** After `pip install`, `Path(__file__).parent.parent` resolves to `site-packages/`, not the repo root. Use a fallback to `/app/agents/` for Docker environments.
 - **Discord privileged intents:** The bot requires **Message Content Intent** enabled in the Developer Portal under Bot → Privileged Gateway Intents. Without it, `PrivilegedIntentsRequired` is raised.
 - **Discord `discord_allow_from` uses user IDs, not usernames:** Values must be numeric Discord user IDs (e.g. `"123456789012345678"`), obtained via right-click → Copy User ID with Developer Mode enabled.
+- **`DISCORD_TOKEN` env var overrides `config.json`:** `load_config()` checks `os.environ.get("DISCORD_TOKEN")` after loading from file. This allows centralizing all secrets in `~/.caveclaw/.env` for production deployments.
