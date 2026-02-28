@@ -83,7 +83,7 @@ jobs:
 
       - name: Deploy with docker compose
         run: |
-          export UID=$(id -u) GID=$(id -g)
+          export DOCKER_UID=$(id -u) DOCKER_GID=$(id -g)
           docker compose -f docker-compose.prod.yml up -d --force-recreate --no-build
 
       - name: Verify deployment
