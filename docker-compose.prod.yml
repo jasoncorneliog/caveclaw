@@ -6,11 +6,11 @@ services:
     user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
     restart: unless-stopped
     environment:
-      - HOME=/home/caveclaw
+      - CAVECLAW_DIR=/data
     env_file:
       - ${HOME}/.caveclaw/.env
     volumes:
-      - ${HOME}/.caveclaw:/home/caveclaw/.caveclaw
+      - ${HOME}/.caveclaw:/data
     logging:
       driver: json-file
       options:
