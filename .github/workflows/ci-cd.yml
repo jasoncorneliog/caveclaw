@@ -82,7 +82,9 @@ jobs:
         run: docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
       - name: Deploy with docker compose
-        run: docker compose -f docker-compose.prod.yml up -d --force-recreate --no-build
+        run: |
+          export UID=$(id -u) GID=$(id -g)
+          docker compose -f docker-compose.prod.yml up -d --force-recreate --no-build
 
       - name: Verify deployment
         run: |
