@@ -1,0 +1,15 @@
+services:
+  caveclaw-gateway:
+    image: ghcr.io/jasoncorneliog/caveclaw:latest
+    container_name: caveclaw-gateway
+    command: ["gateway"]
+    restart: unless-stopped
+    env_file:
+      - ${HOME}/.caveclaw/.env
+    volumes:
+      - ${HOME}/.caveclaw:/home/caveclaw/.caveclaw
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

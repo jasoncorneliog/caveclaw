@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from pathlib import Path
 
@@ -62,8 +63,17 @@ def resolve_agent_config(config: Config, name: str) -> tuple[str, Path]:
 
 
 def load_config() -> Config:
-    """Load config from disk, or return defaults."""
+    """Load config from disk, or return defaults.
+
+    Environment variables override config file values:
+      - DISCORD_TOKEN overrides discord_token
+    """
     if CONFIG_PATH.exists():
         data = json.loads(CONFIG_PATH.read_text())
-        return Config(**data)
-    return Config()
+        config = Config(**data)
+    else:
+        config = Config()
+    discord_token = os.environ.get("DISCORD_TOKEN")
+    if discord_token:
+        config.discord_token = discord_token
+    return config

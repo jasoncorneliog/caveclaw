@@ -3,3 +3,8 @@ __pycache__
 *.pyc
 *.egg-info
 .claude
+.github
+docker-compose*.yml
+.coverage
+.pytest_cache
+tests
