@@ -7,6 +7,7 @@ services:
     restart: unless-stopped
     environment:
       - CAVECLAW_DIR=/data
+      - HOME=/data
     env_file:
       - ${HOME}/.caveclaw/.env
     volumes:
