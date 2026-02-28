@@ -9,7 +9,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-CONFIG_DIR = Path.home() / ".caveclaw"
+CONFIG_DIR = Path(os.environ["CAVECLAW_DIR"]) if "CAVECLAW_DIR" in os.environ else Path.home() / ".caveclaw"
 CONFIG_PATH = CONFIG_DIR / "config.json"
 AGENTS_DIR = CONFIG_DIR / "agents"
 
