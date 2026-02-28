@@ -3,7 +3,7 @@ services:
     image: ghcr.io/jasoncorneliog/caveclaw:latest
     container_name: caveclaw-gateway
     command: ["gateway"]
-    user: "${UID:-1000}:${GID:-1000}"
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
     restart: unless-stopped
     environment:
       - HOME=/home/caveclaw
