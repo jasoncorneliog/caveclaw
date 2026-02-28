@@ -17,7 +17,7 @@ COPY agents/ agents/
 
 RUN pip install --no-cache-dir .
 
-RUN useradd -m caveclaw
+RUN useradd -m caveclaw && chmod 777 /home/caveclaw
 USER caveclaw
 
 ENTRYPOINT ["caveclaw"]
